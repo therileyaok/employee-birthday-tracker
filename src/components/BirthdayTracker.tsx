@@ -50,14 +50,6 @@ interface Employee {
   date: Date;
 }
 
-const sampleEmployees: Employee[] = [
-  { name: 'John Doe', birthday: '1990-06-05', date: new Date('1990-06-05') },
-  { name: 'Jane Smith', birthday: '1985-07-15', date: new Date('1985-07-15') },
-  { name: 'Bob Johnson', birthday: '1992-08-20', date: new Date('1992-08-20') },
-  { name: 'Alice Brown', birthday: '1988-09-10', date: new Date('1988-09-10') },
-  { name: 'Charlie Wilson', birthday: '1995-10-25', date: new Date('1995-10-25') },
-];
-
 export default function BirthdayTracker() {
   // State for employees and upcoming birthdays
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -104,32 +96,10 @@ export default function BirthdayTracker() {
         setCurrentMonthBirthdays(currentMonthBirthdays);
         setNextMonthBirthdays(nextMonthBirthdays);
       } else {
-        // Use sample employees if no data in IndexedDB
-        setEmployees(sampleEmployees);
-        
-        // Calculate initial upcoming birthdays for sample data
-        const currentDate = new Date();
-        const currentMonth = currentDate.getMonth();
-        const currentDay = currentDate.getDate();
-        
-        const currentMonthBirthdays = sampleEmployees
-          .filter((emp) => {
-            const empMonth = emp.date.getMonth();
-            const empDay = emp.date.getDate();
-            return empMonth === currentMonth && empDay >= currentDay;
-          })
-          .sort((a, b) => a.date.getTime() - b.date.getTime());
-        
-        const nextMonthBirthdays = sampleEmployees
-          .filter((emp) => {
-            const empMonth = emp.date.getMonth();
-            const nextMonth = (currentMonth + 1) % 12;
-            return empMonth === nextMonth;
-          })
-          .sort((a, b) => a.date.getTime() - b.date.getTime());
-        
-        setCurrentMonthBirthdays(currentMonthBirthdays);
-        setNextMonthBirthdays(nextMonthBirthdays);
+        // If no data in IndexedDB, show empty state
+        setEmployees([]);
+        setCurrentMonthBirthdays([]);
+        setNextMonthBirthdays([]);
       }
     }).catch((error) => {
       console.error('Error loading from IndexedDB:', error);
@@ -268,7 +238,11 @@ export default function BirthdayTracker() {
             
             // If birthday is a number (Excel serial date), convert it to proper date string
             if (typeof birthday === 'number') {
-              const date = new Date(Math.round((birthday - 25569) * 86400 * 1000));
+              // Excel serial date to JavaScript Date conversion
+              // Excel uses 1900-01-01 as epoch, JavaScript uses 1970-01-01
+              // 25569 is the number of days between these dates
+              // Add 1 to account for Excel's incorrect 1900 leap year
+              const date = new Date(Math.round((birthday - 25569 + 1) * 86400 * 1000));
               birthday = format(date, 'yyyy-MM-dd');
             }
             
@@ -305,14 +279,16 @@ export default function BirthdayTracker() {
             
             setCurrentMonthBirthdays(currentMonthBirthdays);
             setNextMonthBirthdays(nextMonthBirthdays);
-            setIsSaved(false);
           } else {
             console.error('No valid employees found in the uploaded file');
             alert('No valid employees found in the uploaded file. Please check the format and try again.');
           }
         } catch (error) {
           console.error('Error processing Excel data:', error);
-          alert('Error processing Excel data. Please check the format and try again.');
+          // Only show error if there's a real problem
+          if (error instanceof Error) {
+            alert(`Error processing Excel data: ${error.message}`);
+          }
         }
       };
       reader.onerror = (error) => {
@@ -450,13 +426,29 @@ export default function BirthdayTracker() {
                  ))}
                </div>
 
-              {/* Save Data Button */}
-              <div className="flex justify-end">
+              {/* Save and Clear Buttons */}
+              <div className="flex justify-end gap-4">
                 <button
                   onClick={handleSaveData}
                   className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 mt-4"
                 >
                   Save Data
+                </button>
+                <button
+                  onClick={() => {
+                    setEmployees([]);
+                    setCurrentMonthBirthdays([]);
+                    setNextMonthBirthdays([]);
+                    // Clear from IndexedDB
+                    saveEmployees([]);
+                    // Clear from localStorage
+                    localStorage.removeItem('employeeBirthdays');
+                    localStorage.removeItem('currentMonthBirthdays');
+                    localStorage.removeItem('nextMonthBirthdays');
+                  }}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 mt-4"
+                >
+                  Clear All
                 </button>
               </div>
 
