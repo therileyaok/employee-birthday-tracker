@@ -188,18 +188,16 @@ export default function BirthdayTracker() {
     }
   };
 
-  const handleRemoveEmployee = (name: string) => {
+  const handleRemoveEmployee = async (name: string) => {
     try {
       const updatedEmployees = employees.filter(employee => employee.name !== name);
       setEmployees(updatedEmployees);
       
-      // Save to localStorage with proper validation
-      const validEmployees = updatedEmployees.filter(emp => 
-        emp.name && emp.birthday && emp.date instanceof Date
-      );
-      localStorage.setItem('employeeBirthdays', JSON.stringify(validEmployees));
+      // Save to IndexedDB
+      await saveEmployees(updatedEmployees);
     } catch (error) {
       console.error('Error removing employee:', error);
+      alert('Error removing employee. Please try again.');
     }
   };
 
@@ -236,14 +234,25 @@ export default function BirthdayTracker() {
             const name = row.Name || '';
             let birthday = row.Birthday || '';
             
-            // If birthday is a number (Excel serial date), convert it to proper date string
+            console.log('Processing employee:', name);
+            console.log('Raw birthday:', birthday, 'typeof:', typeof birthday);
+            
             if (typeof birthday === 'number') {
-              // Excel serial date to JavaScript Date conversion
-              // Excel uses 1900-01-01 as epoch, JavaScript uses 1970-01-01
-              // 25569 is the number of days between these dates
-              // Add 1 to account for Excel's incorrect 1900 leap year
-              const date = new Date(Math.round((birthday - 25569 + 1) * 86400 * 1000));
+              // Convert Excel serial number to JavaScript Date
+              // Excel's date system starts from 1900-01-01 (serial number 1)
+              // JavaScript's Date starts from 1970-01-01
+              // We subtract 25569 days (difference between 1900-01-01 and 1970-01-01)
+              // and add 1 to account for Excel's incorrect leap year bug in 1900
+              const date = new Date((birthday - 25569 + 1) * 86400 * 1000);
               birthday = format(date, 'yyyy-MM-dd');
+              console.log('Converted birthday:', birthday);
+            } else if (typeof birthday === 'string') {
+              // If birthday is already a string, try to parse it
+              const date = new Date(birthday);
+              if (!isNaN(date.getTime())) {
+                birthday = format(date, 'yyyy-MM-dd');
+                console.log('Parsed birthday:', birthday);
+              }
             }
             
             return {
@@ -419,7 +428,7 @@ export default function BirthdayTracker() {
                      <div>
                        <h3 className="font-semibold">{employee.name}</h3>
                        <p className="text-sm text-gray-600">
-                         {format(employee.date, 'MMMM do')}
+                         {employee.birthday.substring(5)}
                        </p>
                      </div>
                    </div>
